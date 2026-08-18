@@ -96,7 +96,9 @@ def resolve_excel_path() -> Path:
     candidate_paths = []
     env_path = os.getenv("QSR_EXCEL_PATH")
     if env_path:
-        candidate_paths.append(Path(env_path).expanduser())
+        p = Path(env_path).expanduser()
+        if p.exists() or (not str(env_path).startswith("C:") and not str(env_path).startswith("c:")):
+            candidate_paths.append(p)
 
     candidate_paths.extend(
         [

@@ -10,12 +10,15 @@ from etl import load_excel_to_sqlite, resolve_excel_path
 
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 def get_db_path() -> Path:
     env_path = os.getenv("QSR_DB_PATH")
     if env_path:
-        return Path(env_path).expanduser()
+        p = Path(env_path).expanduser()
+        if p.exists() or (not str(env_path).startswith("C:") and not str(env_path).startswith("c:")):
+            return p
     return Path(__file__).resolve().parent / "qsr.db"
 
 
@@ -63,14 +66,43 @@ def get_summary_last_n_months(n: int = 3) -> Dict[str, Any]:
             AVG(o.NET_REVENUE) AS average_order_value
         FROM Orders o
         WHERE strftime('%Y-%m', o.ORDER_DATETIME) IN (
-            SELECT strftime('%Y-%m', date) FROM Calendar
-            GROUP BY strftime('%Y-%m', date)
-            ORDER BY strftime('%Y-%m', date) DESC
+            SELECT DISTINCT strftime('%Y-%m', ORDER_DATETIME)
+            FROM Orders
+            ORDER BY 1 DESC
             LIMIT ?
         )
     """
     rows = run_query(query, (n,))
     return make_json_safe(rows[0] if rows else {})
+
+
+def get_overall_summary() -> Dict[str, Any]:
+    query = """
+        SELECT
+            SUM(o.NET_REVENUE) AS total_revenue,
+            COUNT(o.ORDER_ID) AS total_orders,
+            AVG(o.NET_REVENUE) AS average_order_value,
+            MIN(date(o.ORDER_DATETIME)) AS start_date,
+            MAX(date(o.ORDER_DATETIME)) AS end_date
+        FROM Orders o
+    """
+    rows = run_query(query)
+    return make_json_safe(rows[0] if rows else {})
+
+
+def get_category_performance() -> Dict[str, Any]:
+    query = """
+        SELECT
+            COALESCE(pm.CATEGORY, 'Unknown') AS category,
+            SUM(od.QUANTITY) AS total_quantity,
+            SUM(od.LINE_NET_VALUE) AS total_revenue,
+            COUNT(DISTINCT od.ORDER_ID) AS order_count
+        FROM Order_Details od
+        LEFT JOIN Product_Master pm ON pm.SKU_ID = od.SKU_ID
+        GROUP BY pm.CATEGORY
+        ORDER BY total_revenue DESC
+    """
+    return make_json_safe({"rows": run_query(query)})
 
 
 def get_top_bottom_stores(n: int = 5) -> Dict[str, Any]:
@@ -179,7 +211,7 @@ def get_weekend_vs_weekday() -> Dict[str, Any]:
             COUNT(o.ORDER_ID) AS order_count,
             AVG(o.NET_REVENUE) AS average_order_value
         FROM Orders o
-        LEFT JOIN Calendar c ON date(o.ORDER_DATETIME) = c.DATE
+        LEFT JOIN Calendar c ON date(o.ORDER_DATETIME) = date(c.DATE)
         GROUP BY c.DAY_TYPE
         ORDER BY c.DAY_TYPE
     """
@@ -194,7 +226,7 @@ def get_festive_vs_normal() -> Dict[str, Any]:
             COUNT(o.ORDER_ID) AS order_count,
             AVG(o.NET_REVENUE) AS average_order_value
         FROM Orders o
-        LEFT JOIN Calendar c ON date(o.ORDER_DATETIME) = c.DATE
+        LEFT JOIN Calendar c ON date(o.ORDER_DATETIME) = date(c.DATE)
         GROUP BY c.FESTIVE_PERIOD
         ORDER BY c.FESTIVE_PERIOD
     """
@@ -212,8 +244,8 @@ def get_declining_stores(n_months: int = 3) -> Dict[str, Any]:
                 SUM(o.NET_REVENUE) AS revenue,
                 AVG(o.DISCOUNT_AMOUNT) AS avg_discount_amount,
                 COUNT(DISTINCT o.ORDER_ID) AS order_count,
-                COUNT(DISTINCT CASE WHEN o.CHANNEL = 'Online' THEN o.ORDER_ID END) AS online_orders,
-                COUNT(DISTINCT CASE WHEN o.CHANNEL = 'Offline' THEN o.ORDER_ID END) AS offline_orders
+                COUNT(DISTINCT CASE WHEN o.CHANNEL IN ('Zomato', 'Swiggy', 'Online') THEN o.ORDER_ID END) AS online_orders,
+                COUNT(DISTINCT CASE WHEN o.CHANNEL IN ('Dine-in', 'Takeaway', 'Offline') THEN o.ORDER_ID END) AS offline_orders
             FROM Orders o
             LEFT JOIN Store_Master sm ON sm.STORE_ID = o.STORE_ID
             GROUP BY o.STORE_ID, sm.STORE_NAME, sm.CITY, strftime('%Y-%m', o.ORDER_DATETIME)
@@ -256,6 +288,21 @@ def get_declining_stores(n_months: int = 3) -> Dict[str, Any]:
     return make_json_safe({"stores": result})
 
 
+def get_general_insights() -> Dict[str, Any]:
+    summary = get_overall_summary()
+    top_stores = get_top_bottom_stores(3)
+    channels = get_channel_performance()
+    categories = get_category_performance()
+    top_skus = get_top_skus(3)
+    return make_json_safe({
+        "summary": summary,
+        "top_stores": top_stores.get("top", []),
+        "channels": channels.get("rows", []),
+        "categories": categories.get("rows", []),
+        "top_skus": top_skus.get("by_revenue", []),
+    })
+
+
 def ensure_database_ready() -> Path:
     db_path = get_db_path()
     if db_path.exists() and db_path.stat().st_size > 0:
@@ -267,7 +314,11 @@ def ensure_database_ready() -> Path:
 
 
 def main() -> None:
-    print("summary_last_n_months:")
+    print("overall_summary:")
+    print(get_overall_summary())
+    print("\ncategory_performance:")
+    print(get_category_performance())
+    print("\nsummary_last_n_months:")
     print(get_summary_last_n_months(3))
     print("\nTop/bottom stores:")
     print(get_top_bottom_stores(5))

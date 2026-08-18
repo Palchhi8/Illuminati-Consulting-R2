@@ -1,9 +1,17 @@
+import sys
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from orchestrator import answer_question
 
 
 QUESTIONS = [
+    "How many orders are there?",
+    "What is the total revenue?",
+    "Which category has the highest revenue?",
+    "Compare revenue between Zomato and Swiggy.",
     "What were the total revenue, orders, and average order value for the last 3 months?",
     "Which are the top 5 and bottom 5 stores by revenue?",
     "How does revenue and average order value vary across different channels?",
@@ -12,6 +20,7 @@ QUESTIONS = [
     "How does weekend performance compare with weekdays?",
     "How does festive-period performance compare with normal periods?",
     "Which stores have consistently declined in the last 3 months, and what are the key reasons?",
+    "What are the most important insights from the QSR data?",
 ]
 
 

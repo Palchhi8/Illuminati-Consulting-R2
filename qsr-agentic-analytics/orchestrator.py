@@ -8,10 +8,13 @@ if __package__ in {None, ""}:
 from agents.intent_agent import classify_question
 from agents.insight_agent import generate_insight
 from queries import (
+    get_category_performance,
     get_channel_performance,
     get_declining_cities,
     get_declining_stores,
     get_festive_vs_normal,
+    get_general_insights,
+    get_overall_summary,
     get_summary_last_n_months,
     get_top_bottom_stores,
     get_top_skus,
@@ -20,7 +23,9 @@ from queries import (
 
 
 CATEGORY_TO_FUNCTION = {
+    "overall_summary": get_overall_summary,
     "summary_last_3_months": get_summary_last_n_months,
+    "category_performance": get_category_performance,
     "top_bottom_stores": get_top_bottom_stores,
     "channel_performance": get_channel_performance,
     "top_skus": get_top_skus,
@@ -28,11 +33,14 @@ CATEGORY_TO_FUNCTION = {
     "weekend_vs_weekday": get_weekend_vs_weekday,
     "festive_vs_normal": get_festive_vs_normal,
     "declining_stores_reasons": get_declining_stores,
+    "general_insights": get_general_insights,
 }
 
 
 SUPPORTED_TYPES = [
+    "overall_summary",
     "summary_last_3_months",
+    "category_performance",
     "top_bottom_stores",
     "channel_performance",
     "top_skus",
@@ -40,6 +48,7 @@ SUPPORTED_TYPES = [
     "weekend_vs_weekday",
     "festive_vs_normal",
     "declining_stores_reasons",
+    "general_insights",
 ]
 
 

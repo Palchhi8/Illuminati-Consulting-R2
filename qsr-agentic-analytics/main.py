@@ -18,6 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 INDEX_HTML = STATIC_DIR / "index.html"
 load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR.parent / ".env")
 
 
 class QuestionRequest(BaseModel):
@@ -73,10 +74,11 @@ def get_available_port(start_port: int, host: str, max_attempts: int = 20) -> in
 
 
 def run_server() -> None:
-    host = os.getenv("HOST", "127.0.0.1")
+    is_render = os.getenv("RENDER") is not None
+    host = os.getenv("HOST", "0.0.0.0" if is_render else "127.0.0.1")
     configured_port = int(os.getenv("PORT", "8000"))
-    auto_port = os.getenv("AUTO_PORT", "true").lower() not in {"0", "false", "no"}
-    use_auto_port = auto_port and host in {"127.0.0.1", "localhost", "0.0.0.0"}
+    auto_port = (os.getenv("AUTO_PORT", "true").lower() not in {"0", "false", "no"}) and not is_render
+    use_auto_port = auto_port and host in {"127.0.0.1", "localhost"}
     port = get_available_port(configured_port, host) if use_auto_port else configured_port
 
     ensure_database_ready()

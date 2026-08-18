@@ -196,7 +196,7 @@
           }
 
           const data = await response.json();
-          const insight = data.insight || 'Something went wrong, please try again.';
+          const insight = (data && (data.insight || data.answer || data.response)) || 'Something went wrong, please try again.';
           thinkingBubble.innerHTML = escapeHtml(insight);
         } catch (error) {
           thinkingBubble.innerHTML = escapeHtml(error.message || 'Something went wrong, please try again.');
